@@ -45,16 +45,15 @@ class DateTimeEncoder(json.JSONEncoder):
             return obj.isoformat()
         return super().default(obj)
 
-# Configuration - Vault paths
-BASE_DIR = Path(os.environ.get('VAULT_PATH', Path.cwd()))
-SESSION_FILE = BASE_DIR / 'System' / '.onboarding-session.json'
-MARKER_FILE = BASE_DIR / 'System' / '.onboarding-complete'
-USER_PROFILE_FILE = BASE_DIR / 'System' / 'user-profile.yaml'
-USER_PROFILE_TEMPLATE = BASE_DIR / 'System' / 'user-profile-template.yaml'
-PILLARS_FILE = BASE_DIR / 'System' / 'pillars.yaml'
-CLAUDE_MD = BASE_DIR / 'CLAUDE.md'
-MCP_CONFIG_EXAMPLE = BASE_DIR / 'System' / '.mcp.json.example'
-MCP_CONFIG_TARGET = BASE_DIR / 'System' / '.mcp.json'
+# Configuration - Vault paths (centralized in core.paths)
+_repo_root = str(Path(__file__).parent.parent.parent)
+if _repo_root not in sys.path:
+    sys.path.append(_repo_root)
+from core.paths import (
+    VAULT_ROOT as BASE_DIR, SESSION_FILE, MARKER_FILE,
+    USER_PROFILE_FILE, USER_PROFILE_TEMPLATE, PILLARS_FILE,
+    CLAUDE_MD, MCP_CONFIG_EXAMPLE, MCP_CONFIG_TARGET,
+)
 
 # Role definitions for validation
 ROLES = {
@@ -661,7 +660,8 @@ def create_person_page(contact: Dict, email_domain: str) -> bool:
         
         # Create appropriate folder
         folder = 'Internal' if is_internal else 'External'
-        people_dir = BASE_DIR / '05-Areas' / 'People' / folder
+        from core.paths import PEOPLE_DIR
+        people_dir = PEOPLE_DIR / folder
         people_dir.mkdir(parents=True, exist_ok=True)
         
         # Create person page

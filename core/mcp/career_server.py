@@ -73,10 +73,13 @@ class DateTimeEncoder(json.JSONEncoder):
             return obj.isoformat()
         return super().default(obj)
 
-# Configuration - Vault paths
-BASE_DIR = Path(os.environ.get('VAULT_PATH', Path.cwd()))
-CAREER_DIR = BASE_DIR / '05-Areas' / 'Career'
-EVIDENCE_DIR = BASE_DIR / '05-Areas' / 'Career' / 'Evidence'
+# Configuration - Vault paths (centralized in core.paths)
+_repo_root = str(Path(__file__).parent.parent.parent)
+if _repo_root not in sys.path:
+    sys.path.append(_repo_root)
+from core.paths import (
+    VAULT_ROOT as BASE_DIR, CAREER_DIR, EVIDENCE_DIR,
+)
 LADDER_FILE = CAREER_DIR / 'Career_Ladder.md'
 
 # Initialize the MCP server

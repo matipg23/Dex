@@ -238,6 +238,10 @@ if [ -n "$PYTHON_CMD" ]; then
     if $PYTHON_CMD -c "import mcp, yaml" 2>/dev/null; then
         echo "✅ Work MCP verified - task sync will work"
         WORK_MCP_STATUS="✅ Working"
+
+        # Generate path constants for CJS/TS consumers
+        echo "Generating path constants..."
+        VAULT_PATH="$(pwd)" $PYTHON_CMD core/paths.py 2>/dev/null || true
     else
         echo "⚠️  Work MCP not working - task sync won't function"
         WORK_MCP_STATUS="⚠️  Needs attention"

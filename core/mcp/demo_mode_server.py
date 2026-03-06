@@ -42,9 +42,11 @@ except ImportError:
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Configuration
-BASE_DIR = Path(os.environ.get('VAULT_PATH', Path.cwd()))
-STATE_FILE = BASE_DIR / 'System' / '.demo-mode-state.json'
+# Configuration (centralized in core.paths)
+_repo_root = str(Path(__file__).parent.parent.parent)
+if _repo_root not in sys.path:
+    sys.path.append(_repo_root)
+from core.paths import VAULT_ROOT as BASE_DIR, STATE_FILE
 
 # Minimum character length for name parts (avoid false positives)
 MIN_TERM_LENGTH = 3
@@ -95,7 +97,8 @@ def save_state(state: dict):
 def scan_people() -> Set[str]:
     """Extract person names from People/ folder filenames."""
     terms = set()
-    people_dir = BASE_DIR / '05-Areas' / 'People'
+    from core.paths import PEOPLE_DIR as _people_dir
+    people_dir = _people_dir
     if not people_dir.exists():
         return terms
 

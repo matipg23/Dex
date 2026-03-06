@@ -39,9 +39,12 @@ from mcp.server.models import InitializationOptions
 import mcp.server.stdio
 import mcp.types as types
 
-# Vault paths
-VAULT_PATH = Path(os.environ.get('VAULT_PATH', Path.cwd()))
-PEOPLE_DIR = VAULT_PATH / "05-Areas" / "People"
+# Vault paths (centralized in core.paths)
+import sys
+_repo_root = str(Path(__file__).parent.parent.parent)
+if _repo_root not in sys.path:
+    sys.path.append(_repo_root)
+from core.paths import VAULT_ROOT as VAULT_PATH, PEOPLE_DIR
 
 # Health system — error queue and health reporting
 try:

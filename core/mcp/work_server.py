@@ -103,27 +103,16 @@ class DateTimeEncoder(json.JSONEncoder):
             return obj.isoformat()
         return super().default(obj)
 
-# Configuration - Vault paths
-_vault_path = os.environ.get('VAULT_PATH')
-if not _vault_path:
-    logging.warning("VAULT_PATH not set — falling back to cwd(). Task ID generation may produce duplicates.")
-BASE_DIR = Path(_vault_path) if _vault_path else Path.cwd()
-TASKS_FILE = BASE_DIR / '03-Tasks/Tasks.md'
-WEEK_PRIORITIES_FILE = BASE_DIR / '02-Week_Priorities' / 'Week_Priorities.md'
-QUARTER_GOALS_FILE = BASE_DIR / '01-Quarter_Goals/Quarter_Goals.md'
-GOALS_FILE = BASE_DIR / 'GOALS.md'  # Legacy, kept for compatibility
-INBOX_DIR = BASE_DIR / '00-Inbox'
-PILLARS_FILE = BASE_DIR / 'System' / 'pillars.yaml'
-SKILL_RATINGS_FILE = BASE_DIR / 'System' / 'Skill_Ratings' / 'ratings.jsonl'
-COMPANIES_DIR = BASE_DIR / '05-Areas' / 'Companies'
-PEOPLE_DIR = BASE_DIR / '05-Areas' / 'People'
-MEETINGS_DIR = BASE_DIR / '00-Inbox' / 'Meetings'
-PEOPLE_INDEX_FILE = BASE_DIR / 'System' / 'People_Index.json'
-MEETING_CACHE_FILE = BASE_DIR / 'System' / 'Memory' / 'meeting-cache.json'
-
-# Demo Mode Configuration
-USER_PROFILE_FILE = BASE_DIR / 'System' / 'user-profile.yaml'
-DEMO_DIR = BASE_DIR / 'System' / 'Demo'
+# Configuration - Vault paths (centralized in core.paths)
+_repo_root = str(Path(__file__).parent.parent.parent)
+if _repo_root not in sys.path:
+    sys.path.append(_repo_root)
+from core.paths import (
+    VAULT_ROOT as BASE_DIR, TASKS_FILE, WEEK_PRIORITIES_FILE,
+    QUARTER_GOALS_FILE, GOALS_FILE, INBOX_DIR, PILLARS_FILE,
+    SKILL_RATINGS_FILE, COMPANIES_DIR, PEOPLE_DIR, MEETINGS_DIR,
+    PEOPLE_INDEX_FILE, MEETING_CACHE_FILE, USER_PROFILE_FILE, DEMO_DIR,
+)
 
 def is_demo_mode() -> bool:
     """Check if demo mode is enabled in user-profile.yaml"""

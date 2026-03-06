@@ -49,10 +49,15 @@ logger = logging.getLogger("commitment-detection")
 # Server instance
 server = Server("commitment-detection")
 
-# Get vault path from environment
-VAULT_PATH = os.environ.get("VAULT_PATH", os.path.expanduser("~/Claudesidian"))
-QUEUE_FILE = Path(VAULT_PATH) / "System" / "commitment_queue.json"
-USER_PROFILE = Path(VAULT_PATH) / "System" / "user-profile.yaml"
+# Vault paths (centralized in core.paths)
+_repo_root = str(Path(__file__).parent.parent.parent)
+if _repo_root not in sys.path:
+    sys.path.append(_repo_root)
+from core.paths import (
+    VAULT_ROOT, COMMITMENT_QUEUE_FILE as QUEUE_FILE,
+    USER_PROFILE_FILE as USER_PROFILE,
+)
+VAULT_PATH = str(VAULT_ROOT)
 
 # ============================================================================
 # CONFIGURATION HELPERS
@@ -273,7 +278,8 @@ def extract_person_name(text: str, app: str) -> Optional[str]:
 def list_people_pages() -> list[dict]:
     """List all person pages in the vault."""
     people = []
-    people_dir = Path(VAULT_PATH) / "05-Areas" / "People"
+    from core.paths import PEOPLE_DIR
+    people_dir = PEOPLE_DIR
     
     if people_dir.exists():
         for subdir in ["Internal", "External"]:
@@ -292,7 +298,8 @@ def list_people_pages() -> list[dict]:
 def list_projects() -> list[dict]:
     """List all projects in the vault."""
     projects = []
-    projects_dir = Path(VAULT_PATH) / "04-Projects"
+    from core.paths import PROJECTS_DIR
+    projects_dir = PROJECTS_DIR
     
     if projects_dir.exists():
         for f in projects_dir.glob("**/*.md"):

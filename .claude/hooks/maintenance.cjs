@@ -14,7 +14,9 @@
 const fs = require('fs');
 const path = require('path');
 
-const vaultRoot = process.env.CLAUDE_PROJECT_DIR || path.resolve(__dirname, '../..');
+const { loadPaths } = require('./paths.cjs');
+const _paths = loadPaths();
+const vaultRoot = _paths.VAULT_ROOT || process.env.CLAUDE_PROJECT_DIR || path.resolve(__dirname, '../..');
 const now = Date.now();
 const DAY_MS = 86400000;
 const report = { staleFiles: [], brokenLinks: [], orphanedPages: [], staleMemory: [] };

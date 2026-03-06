@@ -11,8 +11,11 @@ from typing import Set
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
-BASE_DIR = Path(os.environ.get('VAULT_PATH', Path.cwd()))
-LOG_FILE = BASE_DIR / 'System' / 'obsidian-sync.log'
+import sys
+_repo_root = str(Path(__file__).parent.parent.parent)
+if _repo_root not in sys.path:
+    sys.path.append(_repo_root)
+from core.paths import VAULT_ROOT as BASE_DIR, OBSIDIAN_SYNC_LOG as LOG_FILE
 
 logging.basicConfig(
     level=logging.INFO,

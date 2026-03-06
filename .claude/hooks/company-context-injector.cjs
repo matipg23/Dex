@@ -40,11 +40,12 @@ if (skipExts.includes(ext)) {
   process.exit(0);
 }
 
-const VAULT_ROOT = process.env.CLAUDE_PROJECT_DIR || process.env.VAULT_PATH || process.cwd();
-// Primary location for company pages (new universal pattern)
-const COMPANIES_DIR = path.join(VAULT_ROOT, '05-Areas', 'Companies');
+const { loadPaths } = require('./paths.cjs');
+const _paths = loadPaths();
+const VAULT_ROOT = _paths.VAULT_ROOT || process.env.CLAUDE_PROJECT_DIR || process.env.VAULT_PATH || process.cwd();
+const COMPANIES_DIR = _paths.COMPANIES_DIR || path.join(VAULT_ROOT, '05-Areas', 'Companies');
 // Legacy location for backwards compatibility
-const ACCOUNTS_DIR = path.join(VAULT_ROOT, '05-Areas', 'Accounts');
+const ACCOUNTS_DIR = path.join(_paths.AREAS_DIR || path.join(VAULT_ROOT, '05-Areas'), 'Accounts');
 
 // Helper function to recursively scan a directory for company files
 function scanDir(dirPath, index) {
