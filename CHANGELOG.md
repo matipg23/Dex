@@ -7,6 +7,25 @@ All notable changes to Dex will be documented in this file.
 
 ---
 
+## [1.19.0] — Semantic Search Now Covers Your Entire Vault (2026-03-23)
+
+### 🔍 Semantic Search Now Covers Your Entire Vault
+
+**Before:** Smart search only covered 6 folders — meetings, people, projects,
+accounts, tasks, and goals. Finding anything in your PRDs, plans, or session
+learnings required remembering exact keywords.
+
+**Now:** Semantic search covers 14 collections across your whole vault.
+PRDs, implementation plans, session learnings, and resource docs are all
+searchable by meaning.
+
+**Result:** Ask "what did we decide about notifications?" or "find past work
+on MCP integration" — Dex finds the right content wherever it lives.
+
+**To pick up new collections:** Run `/enable-semantic-search`.
+
+---
+
 ## [1.18.3] — Fix Python Install on Modern Macs + Atlassian MCP Config (2026-03-21)
 
 **Python/pip fix (affects most macOS users with Homebrew):**
