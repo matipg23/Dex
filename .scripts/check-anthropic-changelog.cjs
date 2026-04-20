@@ -119,16 +119,22 @@ function shouldCheck(state, force) {
 
 function fetchChangelog(url) {
   return new Promise((resolve, reject) => {
-    https.get(url, (res) => {
+    const req = https.get(url, (res) => {
       if (res.statusCode !== 200) {
         reject(new Error(`HTTP ${res.statusCode}`));
         return;
       }
-      
+
       let data = '';
       res.on('data', chunk => data += chunk);
       res.on('end', () => resolve(data));
     }).on('error', reject);
+
+    // Fail fast — don't block session startup if the network is slow
+    req.setTimeout(10000, () => {
+      req.destroy();
+      reject(new Error('Request timed out after 10s'));
+    });
   });
 }
 

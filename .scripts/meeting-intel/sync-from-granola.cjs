@@ -88,6 +88,9 @@ const GRANOLA_CACHE = getGranolaCachePath();
 const GRANOLA_CREDS = getGranolaCredsPath();
 const STATE_FILE = path.join(__dirname, 'processed-meetings.json');
 const MEETINGS_DIR = path.join(VAULT_ROOT, '00-Inbox', 'Meetings');
+/** Manual drop folders: when API + Granola cache produce no new meetings, process these. */
+const TRANSCRIPTS_INBOX = path.join(MEETINGS_DIR, '_transcripts');
+const NOTES_INBOX = path.join(MEETINGS_DIR, '_notes');
 const QUEUE_FILE = path.join(MEETINGS_DIR, 'queue.md');
 const LOG_DIR = path.join(VAULT_ROOT, '.scripts', 'logs');
 const PILLARS_FILE = path.join(VAULT_ROOT, 'System', 'pillars.yaml');
@@ -628,6 +631,112 @@ function getNewMeetings(cache, state, forceToday = false) {
   return newMeetings;
 }
 
+// ============================================================================
+// LOCAL INBOX — _transcripts / _notes (when Granola automation has nothing new)
+// ============================================================================
+
+const LOCAL_INBOX_TEXT_EXT = new Set(['.md', '.txt', '.vtt', '.markdown']);
+
+/**
+ * Pair files in 00-Inbox/Meetings/_transcripts and _notes by filename stem (basename without ext).
+ * Each stem becomes one synthetic meeting: notes + transcript content for LLM / basic note.
+ *
+ * @param {object} state — processed-meetings.json state (mutate not required)
+ * @returns {Array<object>} meetings shaped like API/cache meetings
+ */
+function gatherLocalInboxMeetings(state) {
+  const processed = state.processedMeetings || {};
+  const byStem = {};
+
+  function scanDir(dir, field) {
+    if (!fs.existsSync(dir)) return;
+    for (const f of fs.readdirSync(dir)) {
+      const full = path.join(dir, f);
+      if (fs.statSync(full).isDirectory()) continue;
+      const ext = path.extname(f).toLowerCase();
+      if (!LOCAL_INBOX_TEXT_EXT.has(ext)) continue;
+      const stem = path.basename(f, ext);
+      if (!stem || stem.startsWith('.') || stem.toLowerCase() === 'readme') continue;
+      if (!byStem[stem]) byStem[stem] = {};
+      byStem[stem][field] = full;
+      try {
+        const m = fs.statSync(full).mtime;
+        byStem[stem]._mtime = byStem[stem]._mtime
+          ? new Date(Math.max(byStem[stem]._mtime.getTime(), m.getTime()))
+          : m;
+      } catch (_) {
+        /* ignore */
+      }
+    }
+  }
+
+  scanDir(TRANSCRIPTS_INBOX, 'transcriptPath');
+  scanDir(NOTES_INBOX, 'notesPath');
+
+  const cutoffDate = new Date();
+  cutoffDate.setDate(cutoffDate.getDate() - LOOKBACK_DAYS);
+
+  const out = [];
+
+  for (const stem of Object.keys(byStem)) {
+    const rec = byStem[stem];
+    const id = `local-inbox:${stem}`;
+
+    if (processed[id]) continue;
+
+    let notes = '';
+    let transcript = '';
+
+    try {
+      if (rec.notesPath) notes = fs.readFileSync(rec.notesPath, 'utf-8');
+    } catch (e) {
+      log(`  Warning: could not read notes file for ${stem}: ${e.message}`);
+    }
+    try {
+      if (rec.transcriptPath) transcript = fs.readFileSync(rec.transcriptPath, 'utf-8');
+    } catch (e) {
+      log(`  Warning: could not read transcript file for ${stem}: ${e.message}`);
+    }
+
+    if (notes.length < MIN_NOTES_LENGTH && transcript.length < MIN_NOTES_LENGTH) continue;
+
+    const dateMatch = stem.match(/^(\d{4}-\d{2}-\d{2})/);
+    let createdAt;
+    if (dateMatch) {
+      createdAt = `${dateMatch[1]}T12:00:00.000Z`;
+    } else if (rec._mtime) {
+      createdAt = rec._mtime.toISOString();
+    } else {
+      createdAt = new Date().toISOString();
+    }
+
+    const createdDay = new Date(createdAt);
+    if (!isNaN(createdDay.getTime()) && createdDay < cutoffDate) continue;
+
+    const title = stem
+      .replace(/^\d{4}-\d{2}-\d{2}[-_\s]*/, '')
+      .replace(/[-_]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim() || stem;
+
+    out.push({
+      id,
+      title,
+      createdAt,
+      updatedAt: rec._mtime ? rec._mtime.toISOString() : createdAt,
+      notes: notes.trim(),
+      transcript: transcript.trim(),
+      participants: [],
+      company: extractCompanyFromTitle(title),
+      duration: null,
+      source: 'local-inbox'
+    });
+  }
+
+  out.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  return out;
+}
+
 function extractCompanyFromTitle(title) {
   if (!title) return '';
 
@@ -718,6 +827,15 @@ Generate a structured analysis in this exact markdown format:
 
 ${intelSection}
 
+## Meeting Path
+
+[One-line folder path, no dates. Format: "Category/Series" or just "Category". Examples:
+- Recurring team meeting → Formation Design/Weekly Planning
+- BU partnership sync → Sportsbook/Formation-SBK-Sync
+- External vendor → Figma/API Sync
+- Project-specific → Token Migration
+- 1:1 → Kevin 1:1]
+
 ## Pillar Assignment
 
 [Choose ONE primary pillar from: ${pillarList}]
@@ -786,6 +904,55 @@ function generateTaskId() {
   return num.toString().padStart(3, '0');
 }
 
+function classifyMeetingPath(meeting, analysis, profile) {
+  const date = meeting.createdAt.split('T')[0];
+  const slug = slugify(meeting.title);
+  const ownerName = profile.name || '';
+  const ownerFirst = ownerName.split(' ')[0].toLowerCase();
+
+  const others = meeting.participants.filter(p => {
+    const pl = p.toLowerCase();
+    return pl !== ownerName.toLowerCase() && !pl.startsWith(ownerFirst);
+  });
+
+  // 1:1: exactly one other participant
+  if (others.length === 1) {
+    const firstName = others[0].split(' ')[0];
+    return {
+      folderParts: [`${firstName} 1:1`],
+      filename: `${date}-${slug}.md`
+    };
+  }
+
+  // LLM-provided path
+  if (analysis) {
+    const match = analysis.match(/## Meeting Path\s*\n+([^\n]+)/i);
+    if (match) {
+      const raw = match[1].trim().replace(/[\[\]"'`]/g, '');
+      if (raw && raw.length > 0 && !raw.startsWith('[')) {
+        const parts = raw.split('/').map(p => p.trim()).filter(Boolean);
+        if (parts.length > 0) {
+          return { folderParts: parts, filename: `${date}-${slug}.md` };
+        }
+      }
+    }
+  }
+
+  // Fallback: first 3 significant words of title as folder
+  const words = meeting.title
+    .replace(/[:\-–—|]/g, ' ')
+    .trim()
+    .split(/\s+/)
+    .filter(w => w.length > 2)
+    .slice(0, 3)
+    .join(' ');
+
+  return {
+    folderParts: [words || 'Meetings'],
+    filename: `${date}-${slug}.md`
+  };
+}
+
 // ============================================================================
 // NOTE GENERATION
 // ============================================================================
@@ -802,13 +969,12 @@ function createMeetingNote(meeting, analysis, profile, pillars) {
   const date = meeting.createdAt.split('T')[0];
   const time = meeting.createdAt.split('T')[1]?.slice(0, 5) || '00:00';
 
-  const outputDir = path.join(MEETINGS_DIR, date);
+  const { folderParts, filename } = classifyMeetingPath(meeting, analysis, profile);
+  const outputDir = path.join(MEETINGS_DIR, ...folderParts);
   if (!fs.existsSync(outputDir)) {
     fs.mkdirSync(outputDir, { recursive: true });
   }
 
-  const slug = slugify(meeting.title);
-  const filename = `${slug}.md`;
   const filepath = path.join(outputDir, filename);
 
   // Extract pillar from analysis
@@ -823,19 +989,29 @@ function createMeetingNote(meeting, analysis, profile, pillars) {
     !p.toLowerCase().includes(ownerName.toLowerCase().split(' ')[0])
   );
 
-  const sourceLabel = meeting.source === 'api' ? 'API' : 'Cache';
+  const sourceLabel =
+    meeting.source === 'api'
+      ? 'API'
+      : meeting.source === 'cache'
+        ? 'Cache'
+        : meeting.source === 'local-inbox'
+          ? 'Local inbox (_transcripts / _notes)'
+          : 'Cache';
+
+  const sourceYaml =
+    meeting.source === 'local-inbox' ? 'local-inbox' : 'granola';
 
   const content = `---
 date: ${date}
 time: ${time}
 type: meeting-note
-source: granola
+source: ${sourceYaml}
 title: "${meeting.title.replace(/"/g, '\\"')}"
 participants: [${filteredParticipants.map(p => `"${p}"`).join(', ')}]
 company: "${meeting.company}"
 pillar: "${pillar}"
 duration: ${meeting.duration || 'unknown'}
-granola_id: ${meeting.id}
+granola_id: ${meeting.source === 'local-inbox' ? 'n/a' : meeting.id}
 processed: ${new Date().toISOString()}
 ---
 
@@ -878,7 +1054,7 @@ ${meeting.transcript.slice(0, 5000)}${meeting.transcript.length > 5000 ? '\n\n[T
 
   return {
     filepath,
-    wikilink: `00-Inbox/Meetings/${date}/${slug}.md`
+    wikilink: `00-Inbox/Meetings/${folderParts.join('/')}/${filename}`
   };
 }
 
@@ -890,13 +1066,12 @@ function createBasicMeetingNote(meeting, profile) {
   const date = meeting.createdAt.split('T')[0];
   const time = meeting.createdAt.split('T')[1]?.slice(0, 5) || '00:00';
 
-  const outputDir = path.join(MEETINGS_DIR, date);
+  const { folderParts, filename } = classifyMeetingPath(meeting, null, profile);
+  const outputDir = path.join(MEETINGS_DIR, ...folderParts);
   if (!fs.existsSync(outputDir)) {
     fs.mkdirSync(outputDir, { recursive: true });
   }
 
-  const slug = slugify(meeting.title);
-  const filename = `${slug}.md`;
   const filepath = path.join(outputDir, filename);
 
   const ownerName = profile.name || '';
@@ -913,15 +1088,18 @@ function createBasicMeetingNote(meeting, profile) {
     ? `## Transcript\n\n${meeting.transcript.slice(0, 5000)}${meeting.transcript.length > 5000 ? '\n\n[Truncated...]' : ''}\n`
     : '';
 
+  const basicSourceYaml =
+    meeting.source === 'local-inbox' ? 'local-inbox' : 'granola';
+
   const content = `---
 date: ${date}
 time: ${time}
 type: meeting-note
-source: granola
+source: ${basicSourceYaml}
 title: "${meeting.title.replace(/"/g, '\\"')}"
 participants: [${filteredParticipants.map(p => `"${p}"`).join(', ')}]
 company: "${meeting.company || ''}"
-granola_id: ${meeting.id}
+granola_id: ${meeting.source === 'local-inbox' ? 'n/a' : meeting.id}
 processed: ${new Date().toISOString()}
 ai_analyzed: false
 ---
@@ -946,7 +1124,7 @@ ${transcriptSection}
 
   return {
     filepath,
-    wikilink: `00-Inbox/Meetings/${date}/${slug}.md`
+    wikilink: `00-Inbox/Meetings/${folderParts.join('/')}/${filename}`
   };
 }
 
@@ -1105,6 +1283,16 @@ async function main() {
     newMeetings = getNewMeetings(cache, state, force);
   }
 
+  // When Granola API + cache produced no new rows, try manual drops under _transcripts / _notes
+  if (newMeetings.length === 0) {
+    const localMeetings = gatherLocalInboxMeetings(state);
+    if (localMeetings.length > 0) {
+      newMeetings = localMeetings;
+      dataSource = 'local-inbox';
+      log(`  Using local inbox folders (${localMeetings.length} meeting(s))`);
+    }
+  }
+
   log(`Found ${newMeetings.length} new meetings to process (source: ${dataSource})`);
 
   if (newMeetings.length === 0) {
@@ -1220,4 +1408,4 @@ if (require.main === module) {
     });
 }
 
-module.exports = { main, readGranolaCache, getNewMeetings };
+module.exports = { main, readGranolaCache, getNewMeetings, gatherLocalInboxMeetings };

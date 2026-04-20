@@ -73,12 +73,14 @@ The system automatically suggests `/getting-started` at next session if vault < 
 ## User Profile
 
 <!-- Updated during onboarding -->
-**Name:** Not yet configured
-**Role:** Not yet configured
-**Company Size:** Not yet configured
-**Working Style:** Not yet configured
+**Name:** Matias Peinado Greco
+**Role:** Product Design Senior Manager, Design Systems at FanDuel
+**Company Size:** Enterprise (1,000–10,000 people)
+**Working Style:** Hybrid IC + Manager — craft-first leader who balances hands-on design (tokens, components) with team mentorship, cross-functional strategy, and design system advocacy. Believes in people before processes, leads by example, and sneaks in a GIF or two.
 **Pillars:**
-- Not yet configured
+- Establish Formation Design System as Strategic Product Partner
+- Transform Formation Design System into an AI-Ready Design System
+- Empower Business Unit Teams to Succeed powered by Formation Design System
 
 ---
 

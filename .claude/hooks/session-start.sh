@@ -94,13 +94,12 @@ if [[ -f "$ONBOARDING_MARKER" ]]; then
         TODAY=$(date +%Y-%m-%d)
         
         if [[ ! -f "$LAST_LEARNING_CHECK" ]] || [[ "$(cat "$LAST_LEARNING_CHECK")" != "$TODAY" ]]; then
-            bash "$CLAUDE_DIR/.scripts/learning-review-prompt.sh" 2>/dev/null &
+            bash "$CLAUDE_DIR/.scripts/learning-review-prompt.sh" >/dev/null 2>&1 &
+            disown $!
             echo "$TODAY" > "$LAST_LEARNING_CHECK"
         fi
     fi
 
-    # Wait briefly for checks to complete (but don't block session start)
-    sleep 0.1
 fi
 
 echo ""

@@ -71,7 +71,10 @@ The background sync uses your LLM API to extract:
 - **Customer intelligence** (pain points, feature requests, competitive mentions)
 - **Pillar classification** based on your `System/pillars.yaml`
 
-**Output location:** `00-Inbox/Meetings/YYYY-MM-DD/meeting-slug.md`
+**Output location:** `00-Inbox/Meetings/{Category}/{YYYY-MM-DD-meeting-slug}.md`
+- 1:1s → `Kevin 1:1/2026-04-20-kevin-matias-1-1.md`
+- Team meetings → `Formation Design/Weekly Planning/2026-04-20-formation-weekly-planning.md`
+- BU syncs → `Sportsbook/Formation-SBK-Sync/2026-04-20-meeting.md`
 
 ## Configuration
 
@@ -86,6 +89,20 @@ meeting_intelligence:
 ```
 
 Internal vs external classification uses your `email_domain` setting.
+
+## Local drop folders (no Granola sync)
+
+If the Granola API and local cache both yield **no new meetings** for this run, the sync script will look for paired files under:
+
+- `00-Inbox/Meetings/_transcripts/` — transcript (`.md`, `.txt`, `.vtt`)
+- `00-Inbox/Meetings/_notes/` — notes (same extensions)
+
+Files are **matched by filename stem** (the part before the extension). Example:
+
+- `_transcripts/2026-04-20-design-sync.txt`
+- `_notes/2026-04-20-design-sync.md`
+
+Together they become one synthetic meeting. A file in only one folder still counts if it meets the minimum length (same threshold as Granola notes). Prefer **date prefixes** (`YYYY-MM-DD-...`) in the stem so the meeting date is parsed correctly; otherwise the file’s modification time is used. The same lookback window applies as Granola (`LOOKBACK_DAYS` in the script, default 7 days). Processed items are tracked in `processed-meetings.json` with ids like `local-inbox:2026-04-20-design-sync`.
 
 ## Manual Sync (Optional)
 
@@ -143,7 +160,10 @@ node .scripts/meeting-intel/sync-from-granola.cjs --force
 │ Background Sync (launchd, every 30 min)              │
 │  - sync-from-granola.cjs → API fetch + LLM analysis │
 │  - Auth: reads Granola's local supabase.json         │
-│  - Fallback: local cache-v*.json (desktop only)      │
+│  - Fallback 1: local cache-v*.json (desktop only)    │
+│  - Fallback 2: 00-Inbox/Meetings/_transcripts +      │
+│    _notes (paired by filename stem) if no Granola    │
+│    meetings in range                                 │
 └──────────────────────┬──────────────────────────────┘
                        │ LLM extraction (Gemini/Claude/GPT)
                        ▼

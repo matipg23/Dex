@@ -14,15 +14,45 @@
 #
 # The Work MCP uses these to categorize tasks and check balance across your work.
 
-pillars: []
-  # Will be populated during onboarding
-  # Example structure:
-  # - id: pillar_id
-  #   name: "Pillar Name"
-  #   description: "What this pillar represents"
-  #   keywords:
-  #     - keyword1
-  #     - keyword2
+pillars:
+  - id: strategic_partner
+    name: "Strategic Product Partner"
+    description: "Establish Formation Design System as a trusted strategic partner across FanDuel product teams"
+    keywords:
+      - strategic
+      - partnership
+      - stakeholder
+      - alignment
+      - roadmap
+      - influence
+      - adoption
+      - product partner
+
+  - id: ai_ready
+    name: "AI-Ready Design System"
+    description: "Transform Formation Design System to be ready for AI-powered design and development workflows"
+    keywords:
+      - AI
+      - artificial intelligence
+      - automation
+      - tokens
+      - components
+      - scalability
+      - future-ready
+      - AI-native
+
+  - id: bu_empowerment
+    name: "Business Unit Empowerment"
+    description: "Empower Business Unit teams to succeed independently using Formation Design System"
+    keywords:
+      - business unit
+      - BU
+      - enablement
+      - autonomy
+      - documentation
+      - self-service
+      - team success
+      - guidance
 
 # Priority limits (how many active tasks per priority level)
 priority_limits:

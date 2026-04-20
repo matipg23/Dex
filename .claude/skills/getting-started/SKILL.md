@@ -46,7 +46,7 @@ else:
 Say: "Hold on... analyzing your calendar and meetings. 🔍"
 
 **Execute analysis:**
-1. Call calendar MCP: `get_events_for_week()` 
+1. Call whichever **calendar** integration you have: Dex’s **Apple Calendar** MCP (`calendar_get_events` / week range), **Microsoft 365 / Graph** MCP (if enabled — use its calendar/list-events tool and filter to this week), or another provider’s equivalent. The onboarding helper uses the Dex calendar server (EventKit), which includes **any account synced to Apple Calendar** (e.g. Microsoft 365 work calendar added on macOS). There is no Google-specific requirement.
 2. Call granola MCP: `get_recent_meetings(days=7)`
 3. Analyze the data
 
